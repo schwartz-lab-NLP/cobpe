@@ -1,0 +1,6 @@
+include LICENSE THIRD_PARTY_NOTICES.md CITATION.cff citation.bib
+recursive-include nanochat LICENSE
+recursive-include cobpe/decomposition LICENSE README.md
+recursive-include cut_cross_entropy LICENSE ACKNOWLEDGEMENTS.md
+recursive-include rust_ext/compositional_runtime Cargo.lock Cargo.toml pyproject.toml
+recursive-include rust_ext/compositional_runtime/src *.rs

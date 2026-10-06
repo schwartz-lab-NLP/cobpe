@@ -1,0 +1,20 @@
+name: Tests
+on:
+  push:
+  pull_request:
+
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: uv sync --locked --extra cpu --group dev
+      - name: Installation smoke check
+        run: uv run --no-sync python -m cobpe check-install
+      - name: Python and tokenizer tests
+        run: uv run --no-sync python -m pytest -m 'not slow'
+      - name: Rust tests
+        run: cargo test --manifest-path rust_ext/compositional_runtime/Cargo.toml

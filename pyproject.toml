@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cobpe"
+version = "0.1.0"
+description = "Compositional tokenization and language modeling"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = [
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "nanochat/LICENSE",
+    "cut_cross_entropy/LICENSE",
+    "cut_cross_entropy/ACKNOWLEDGEMENTS.md",
+    "cobpe/decomposition/LICENSE",
+]
+dependencies = [
+    "datasets>=4.0.0",
+    "filelock>=3.16.0",
+    "jinja2>=3.1.0",
+    "kernels>=0.11.7",
+    "numpy>=1.26.0",
+    "packaging>=24.0",
+    "pyarrow>=18.0.0",
+    "pyyaml>=6.0.0",
+    "requests>=2.32.0",
+    "rustbpe>=0.1.0",
+    "tiktoken>=0.11.0",
+    "tokenizers>=0.22.0",
+    "torch==2.9.1",
+    "tqdm>=4.67.1",
+    "transformers>=4.57.3",
+    "wandb>=0.21.3",
+    "nanochat-compositional-rust==0.1.0",
+]
+
+[project.optional-dependencies]
+cpu = ["torch==2.9.1"]
+gpu = ["torch==2.9.1"]
+
+[dependency-groups]
+dev = ["pytest>=8.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cobpe*", "cut_cross_entropy*", "nanochat*", "scripts*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"nanochat" = ["LICENSE"]
+"cobpe.decomposition" = ["LICENSE", "README.md"]
+"cut_cross_entropy" = ["LICENSE", "ACKNOWLEDGEMENTS.md"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.uv.sources]
+nanochat-compositional-rust = { path = "rust_ext/compositional_runtime", editable = true }
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu128", extra = "gpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]

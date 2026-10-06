@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: 'If you use CoBPE, please cite the accompanying paper.'
+title: CoBPE
+license: Apache-2.0
+authors:
+  - family-names: Reif
+    given-names: Yuval
+  - family-names: Kaplan
+    given-names: Guy
+  - family-names: Schwartz
+    given-names: Roy
+preferred-citation:
+  type: conference-paper
+  title: 'More Than Words: Compositional Tokenization for Efficient Language Models'
+  year: 2026
+  url: "https://openreview.net/forum?id=Yw16kddexd"
+  conference:
+    name: Third Conference on Language Modeling
+  authors:
+    - family-names: Reif
+      given-names: Yuval
+    - family-names: Kaplan
+      given-names: Guy
+    - family-names: Schwartz
+      given-names: Roy
+repository-code: "https://github.com/schwartz-lab-NLP/cobpe"

@@ -1,0 +1,31 @@
+.venv/
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+target/
+dev-ignore/
+report.md
+eval_bundle/
+experiments/
+raw_results/
+logs/
+analysis_dashboard/
+tokenizer_cache/
+wandb/
+
+# Secrets
+.env
+
+# Local setup
+CLAUDE.md
+
+# Build outputs
+*.egg-info/
+build/
+dist/
+
+# Generated measurements
+results/
