@@ -2,7 +2,7 @@
 
 This guide describes the public tokenizer and language-model workflows. It
 assumes the environment from the [README](../README.md) is installed and the
-required ClimbMix parquet shards are available locally.
+commands below are run from the repository root.
 
 ## Configure data and outputs
 
@@ -26,8 +26,8 @@ export TOKENIZER_COBPE_DIR="$DATA_BASE_DIR/tokenizer_cobpe"
 ```
 
 The Slurm wrappers also accept `PARQUET_DATA_DIR` as an alias for
-`LOCAL_PARQUET_DIR`. Training and tokenizer scripts read local parquet shards. Download the desired
-number of ClimbMix training shards plus the validation shard with:
+`LOCAL_PARQUET_DIR`. Training and tokenizer scripts read local parquet shards.
+Download the desired number of training shards plus the validation shard with:
 
 ```bash
 NANOCHAT_BASE_DIR="$DATA_BASE_DIR" \
@@ -82,26 +82,55 @@ TARGET_PARAM_DATA_RATIO=20 WORLD_SIZE=8 \
 bash slurm/paper/11_train_eval_vanilla_cobpe.sh
 ```
 
-The default CoBPE modifier head is `concat_gated_refine` with per-group gates
-conditioned on the hidden state. Set `MODIFIER_CONDITIONING_MODE=base_bias` or
-`MODIFIER_CONDITIONING_MODE=concat_gated` for those alternatives. The
-`MODIFIER_GATE_MODE=scalar` setting selects one shared gate instead of the
-default per-group gates. Model depth, experiment directory, batch size, and
-world size can be overridden as shown above. Give each head or gate ablation a
-distinct `EXP_DIR` and `MODEL_TAG` to keep its checkpoint separate.
+The default CoBPE head is `gated-refinement`. The released head uses one gate
+per modifier group, conditioned on the hidden state. For the simpler heads,
+set `MODIFIER_CONDITIONING_MODE=lexical-bias` or
+`MODIFIER_CONDITIONING_MODE=gated-concat`. See the
+[head options](modifier_base_conditioned_head.md#head-options) for CLI and
+wrapper settings. Give each variant a distinct `EXP_DIR` and `MODEL_TAG`.
 
 The paper also evaluates a 28-layer, 1.3B-parameter variant trained on 26B
 tokens. Use `MODEL_NAME=d28 DEPTH=28` and the same vanilla wrappers to select
 that model scale.
+
+## SuperBPE baseline
+
+The paper uses SuperBPE with transition point `t = 27k`. Its trainer requires a
+separate Python environment containing the `tokenizers-superbpe` fork, which
+is not installed by `uv sync`. Set `SUPERBPE_PYTHON_BIN` to that environment's
+Python executable, then train the tokenizer on the same ClimbMix sample:
+
+```bash
+uv run python -m cobpe train-tokenizer \
+  --output-base-dir "$DATA_BASE_DIR" \
+  --local-parquet-dir "$LOCAL_PARQUET_DIR" \
+  --tokenizer-dirname tokenizer_superbpe \
+  --tokenizer-algorithm superbpe \
+  --superbpe-transition-merges 27000 \
+  --superbpe-python-bin "$SUPERBPE_PYTHON_BIN" \
+  --vocab-size 32768 --max-chars 2000000000 --doc-cap 10000 --seed 42
+```
+
+Train and evaluate the 780M baseline with the vanilla BPE wrapper, selecting
+the SuperBPE tokenizer and a separate output directory:
+
+```bash
+TOKENIZER_BPE_DIR="$DATA_BASE_DIR/tokenizer_superbpe" \
+EXP_DIR=vanilla/superbpe_d24 MODEL_TAG=superbpe_vanilla_d24 \
+MODEL_NAME=d24 DEPTH=24 TARGET_PARAM_DATA_RATIO=20 WORLD_SIZE=8 \
+bash slurm/paper/10_train_eval_vanilla_bpe.sh
+```
 
 ## Nanochat speedrun comparison
 
 The speedrun comparison uses a 24-layer model with hidden size 1536,
 intermediate size 6144, head dimension 128, sequence length 2048, and 8 L40S
 GPUs. Its device batch size is 16 and total batch size is 1,048,576 tokens.
-The training horizon settings are 8.0 tokens per parameter for BPE and 6.5
-for CoBPE; the different values set the training horizon used in the reported
-comparison.
+The paper measures training time to a CORE score of 25.65. The reported runs
+stopped at horizons of 8.0 tokens per parameter for BPE and 6.5 for CoBPE.
+The wrappers train to these fixed horizons and then evaluate; they do not stop
+automatically at the CORE target.
+
 The reported results reach CORE 25.91 for BPE and 26.00 for CoBPE, with 5.84B
 and 4.74B training tokens, respectively. These measurements use the paper's
 8 L40S GPU setup.
@@ -145,3 +174,25 @@ uv run torchrun --standalone --nproc_per_node=8 -m scripts.base_eval \
 For CoBPE, use `NANOCHAT_TOKENIZER_DIR="$TOKENIZER_COBPE_DIR"` and the
 matching CoBPE model tag. The evaluator checks the tokenizer metadata when it
 loads a CoBPE checkpoint.
+
+## Tokenizer compression
+
+Measure bytes per token on the same held-out UTF-8 text file for both
+finalized tokenizers:
+
+```bash
+for tokenizer in "$TOKENIZER_BPE_DIR" "$TOKENIZER_COBPE_DIR"; do
+  uv run python -m cobpe evaluate-tokenizer \
+    --tokenizer-dir "$tokenizer" --text-file /path/to/heldout.txt
+done
+```
+
+The command reports bytes, tokens, bytes per token, and exact roundtrip fidelity
+for each file. Repeat `--text-file` to evaluate multiple documents.
+
+## Not included in this release
+
+The full vocabulary-size and modifier-family sweep for Figure 1, the
+CNN/DailyMail copying benchmark for Table 4, and the UD-derived multilingual
+inventory extraction and evaluation for Table 5 are not included. See the
+[paper](https://arxiv.org/abs/2610.05597) for their protocols and results.

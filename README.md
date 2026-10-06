@@ -30,6 +30,9 @@ finalization, the native Rust runtime, and language-model training and
 evaluation. See the [project website](https://co-bpe.github.io) for a visual
 method overview and more details.
 
+**Model weights: coming soon.** See the [project website](https://co-bpe.github.io)
+for release updates.
+
 ## Quick start
 
 Install [uv](https://docs.astral.sh/uv/) and a current stable
