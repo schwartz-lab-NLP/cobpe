@@ -1,4 +1,4 @@
-# Base-Conditioned Modifier Head: Concat-Gated-Refine
+# Base-conditioned modifier heads
 
 ## Overview
 
@@ -23,10 +23,7 @@ p(b,m_1,\ldots,m_G \mid c)
 
 where \(c\) denotes the preceding context. The standard language-model head
 predicts the base token. A separate base-conditioned head predicts the
-modifier tuple. Conditioning the modifiers on the base is important because
-the plausible realization of a token depends strongly on its lexical identity;
-for example, punctuation, capitalization, and function-word attachment are not
-independent of the selected base.
+modifier tuple, conditioned on the selected base token.
 
 ## Inputs to the modifier head
 
@@ -47,7 +44,7 @@ During training, the modifier head is conditioned on the target base token.
 During autoregressive generation, it is conditioned on the base token selected
 by the model.
 
-## Concat-gated prediction
+## Gated prediction
 
 Let \(K_g\) be the number of values in modifier group \(g\), and define the
 total modifier-logit dimension
@@ -67,9 +64,8 @@ z_h = W_h\,\operatorname{RMSNorm}(h_t),
 z_b = W_b\,\operatorname{RMSNorm}(u_{b_t}).
 \]
 
-A hidden-state-conditioned gate controls how strongly the selected base token
-affects modifier prediction. In the default per-group mode, the gate has one
-value for each modifier group:
+The released head uses one gate per modifier group, conditioned on the hidden
+state:
 
 \[
 \alpha_{t,g} = \sigma(w_{\alpha,g}^\top h_t),
@@ -100,7 +96,7 @@ which modifier values the base supports or suppresses.
 
 ## Residual logit refinement
 
-The concat-gated logits are passed through a residual refinement over the joint
+The gated logits are passed through a residual refinement over the joint
 modifier-logit space:
 
 \[
@@ -111,9 +107,9 @@ where \(W_r \in \mathbb{R}^{M \times M}\). The residual form preserves the
 direct context-plus-base prediction while allowing a learned nonlinear
 correction.
 
-Importantly, refinement occurs before the vector is divided into modifier
-groups. The refinement matrix can therefore communicate across groups: evidence
-for capitalization can alter punctuation logits, for example, even though the
+Refinement occurs before the vector is divided into modifier groups. The
+refinement matrix can therefore communicate across groups: evidence for
+capitalization can alter punctuation logits, for example, even though the
 final group distributions are normalized separately. This supplies a limited
 form of dependency modeling between modifier groups without replacing the
 factorized output distribution with an exponentially large classifier over all
@@ -160,48 +156,28 @@ configuration).
 ## Initialization
 
 The refinement branch is initialized as a neutral residual, so the head begins
-as the simpler concat-gated predictor. The gate begins at the midpoint of its
+as the simpler `gated-concat` predictor. The gate begins at the midpoint of its
 sigmoid range, allowing both the contextual and lexical branches to receive
 learning signal from the start. This makes the additional refinement capacity
 available gradually rather than perturbing the initial modifier distribution.
 
-## Architectural interpretation
+## Head options
 
-The supported head modes are:
+- `lexical-bias`: add a learned base-token bias to the context prediction.
+- `gated-concat`: combine context and base-token projections with a gate.
+- `gated-refinement` (default): refine the combined logits across modifier groups
+  before applying the groupwise softmax.
 
-- `lexical-bias` (checkpoint mode `base_bias`): add a learned base-token vector to a
-  context-only modifier prediction.
-- `gated-concat` (checkpoint mode `concat_gated`): gate a projection of the base-token
-  unembedding into context-based modifier logits.
-- `gated-refinement` (checkpoint mode `concat_gated_refine`, default): apply
-  the joint residual refinement after the per-group gated projections.
+Pass the public name to `--modifier-head` or set `MODIFIER_CONDITIONING_MODE`
+in the training wrappers. Checkpoints store the corresponding value below;
+these values are also accepted by the CLI and wrappers.
 
-Concat-gated-refine combines three complementary inductive biases:
+| Public name | Checkpoint value |
+| --- | --- |
+| `lexical-bias` | `base_bias` |
+| `gated-concat` | `concat_gated` |
+| `gated-refinement` | `concat_gated_refine` |
 
-1. **Contextual prediction.** The transformer state predicts modifiers from the
-   preceding sequence.
-2. **Lexical conditioning.** The selected base token directly influences which
-   surface-form transformations are plausible.
-3. **Cross-group refinement.** A residual nonlinear map captures interactions
-   among modifier groups before groupwise normalization.
-
-The resulting head remains substantially smaller and more structured than a
-flat classifier over every valid base-modifier combination. At the same time,
-it is more expressive than independent modifier classifiers that see only the
-transformer state or incorporate the base token as a fixed additive bias.
-
-## Method summary
-
-> We predict CoBPE modifiers with a base-conditioned concat-gated-refine head.
-> Given the final transformer state \(h_t\) and the unembedding vector
-> \(u_{b_t}\) of the selected base token, the head projects both representations
-> to modifier logits. For each modifier group \(g\), a hidden-state-conditioned
-> gate \(\alpha_{t,g}=\sigma(w_{\alpha,g}^\top h_t)\) scales the base-token
-> projection before it is added to the context projection. The resulting joint
-> logit vector is passed through a residual refinement
-> \(\tilde z_t=z_t+W_r\operatorname{SiLU}(z_t)\) over the joint modifier-logit
-> space. Finally, \(\tilde z_t\) is partitioned by modifier group and normalized
-> with a separate softmax for each group. This design conditions surface-form
-> prediction on both context and lexical identity, while the joint refinement
-> permits interactions among modifier groups without enumerating their full
-> Cartesian product.
+Use `--modifier-gates per_group` (or `MODIFIER_GATE_MODE=per_group` in the
+wrappers) for the released implementation. The `scalar` option shares one gate
+across all groups.
